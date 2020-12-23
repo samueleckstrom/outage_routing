@@ -109,6 +109,7 @@ def get_shortest_path_greedy_best_first(intersection_dictionary, starting_key, e
 
 def get_distance_matrix(outages, intersection_dictionary):
   distance_matrix = [[0.0 for i in range(len(outages))] for j in range(len(outages))]
+  print(len(distance_matrix))
   for i in range(len(outages)):
     for j in range(len(outages)):
       if i == j:
@@ -116,7 +117,6 @@ def get_distance_matrix(outages, intersection_dictionary):
       else:
         for intersection in intersection_dictionary.values():
           intersection.has_been_read = False
-        print(i * j)
         path = get_shortest_path_greedy_best_first(intersection_dictionary, outages[i].closest_intersection.key,
           outages[j].closest_intersection.key)
         if path == 'no shortest path':
@@ -207,7 +207,7 @@ def get_random_intersections(intersection_dictionary, number_of_intersections = 
 
 def create_vehicle_routing_data(list_of_clusters, k_means_centroids, list_of_starting_intersections):
   for starting_intersection in list_of_starting_intersections:
-    (key, _, _, _) = find_closest_centroid(starting_intersection[1].latitude, starting_intersection[1].longitude, k_means_centroids)
+    (key, _, _, _) = find_closest_centroid(starting_intersection[1].latitude, starting_intersection[1].longitude, [cluster.centroid for cluster in list_of_clusters])
     list_of_clusters[key].vehicles.append(starting_intersection)
     # list_of_clusters[key].outages.append(Outage(-1, starting_intersection[1].latitude, starting_intersection[1].longitude, starting_intersection[1]))
 
@@ -233,16 +233,21 @@ def print_solution(data, manager, routing, solution):
 
 
 def vehicular_routing_problem(data):
-  print('here')
   # Create the routing index manager.
   # [START index_manager]
-  manager = pywrapcp.RoutingIndexManager(len(data['distance_matrix']), data['num_vehicles'], data['starts'])
+  print(data['distance_matrix'])
+  print(data['num_vehicles'])
+  print(data['starts'])
+  print(data['ends'])
+  manager = pywrapcp.RoutingIndexManager(len(data['distance_matrix']), 
+    data['num_vehicles'], data['starts'], data['ends'])
   # [END index_manager]
 
+  print('after manager')
   # Create Routing Model.
   # [START routing_model]
   routing = pywrapcp.RoutingModel(manager)
-
+  print('after routing')
   # Create and register a transit callback.
   # [START transit_callback]
   def distance_callback(from_index, to_index):
@@ -266,7 +271,7 @@ def vehicular_routing_problem(data):
   routing.AddDimension(
       transit_callback_index,
       0,  # no slack
-      2000,  # vehicle maximum travel distance
+      200000000,  # vehicle maximum travel distance
       True,  # start cumul to zero
       dimension_name)
   distance_dimension = routing.GetDimensionOrDie(dimension_name)
@@ -294,21 +299,24 @@ def vehicular_routing_problem(data):
 def main():
   intersection_dictionary = get_routing_data()
   number_of_k_means_iterations = 1
-  number_of_outages = 100
+  number_of_outages = 25
   for iteration in range(number_of_k_means_iterations):
     for number_of_centroids in range(number_of_outages - 2):
       (list_of_clusters, k_means_centroids) = k_means(intersection_dictionary, number_of_outages, number_of_k_means_iterations, number_of_centroids + 2)
-      list_of_starting_intersections = get_random_intersections(intersection_dictionary, number_of_intersections = 100)
-      create_vehicle_routing_data(list_of_clusters[0], k_means_centroids, list_of_starting_intersections)
+      list_of_starting_intersections = get_random_intersections(intersection_dictionary, number_of_intersections = 10)
+      #create_vehicle_routing_data(list_of_clusters[0], k_means_centroids, list_of_starting_intersections)
       distance_matrix = []
       for clusters in list_of_clusters:
         for cluster in clusters.values():
           data = { }
-          print('before distance')
           data['distance_matrix'] = get_distance_matrix(cluster.outages, intersection_dictionary)
-          print('after distance')
-          data['num_vehicles'] = len(list_of_starting_intersections)
-          data['starts'] = [randint(0, len(cluster.outages)) for i in range(len(list_of_starting_intersections))]
-          vehicular_routing_problem(data)
+          if len(data['distance_matrix'][0]) > 1:
+            random_number_of_vehicles = 2 # randint(1, 12 - iteration)
+            data['num_vehicles'] = random_number_of_vehicles
+            data['starts'] = [randint(1, len(cluster.outages) - 1) for i in range(random_number_of_vehicles)]
+            end_index = 0 #randint(0, len(cluster.outages))
+            data['ends'] = [end_index for i in range(random_number_of_vehicles)]
+            print('before vrp')
+            vehicular_routing_problem(data)
 
 main()
